@@ -129,7 +129,7 @@ static void timers_config(void)
 
 struct LED_Stripe
 {
-    static const uint32_t LedsCount = 1;
+    static const uint32_t LedsCount = 30;
 };
 
 static const uint32_t AHB_Frequency_kHz = 48'000;
@@ -139,7 +139,8 @@ struct LED_TransferTime
     //
     // Datasheet edition
     //
-    static const uint32_t Reset_ns  = 50'000;
+    // Note: Reset cycle is 50mu but...
+    static const uint32_t Reset_ns  = 75'000;
     static const uint32_t Period_ns =  1'250;
     static const uint32_t T0H_ns    =    400;
     static const uint32_t T1H_ns    =    800;
@@ -169,7 +170,7 @@ struct LED_Color
 class LED_PwmBuffer
 {
 public:
-    static const uint32_t kResetCycles = LED_TransferTime::Reset_ns / LED_TransferTime::Period_ns + 4;
+    static const uint32_t kResetCycles = LED_TransferTime::Reset_ns / LED_TransferTime::Period_ns;
     static const uint32_t kLedsCount = LED_Stripe::LedsCount;
 
     static const uint32_t kPulseWidth0 = LED_TransferTime::T0H - 1;
@@ -178,12 +179,12 @@ public:
     static const uint32_t kBitsInColor = 24;
     static const uint32_t kBufferLength = kResetCycles + kLedsCount * kBitsInColor;
 
-    static const uint32_t kProtectMask = 0xf0f0f0f0;
+    static const uint32_t kProtectMask = 0x0f0f0f;
 
 
     void writeLED( LED_Color color, uint32_t position);
 
-    uint32_t getPulseWidth( bool bit) { return bit ? kPulseWidth0 : kPulseWidth1; }
+    uint32_t getPulseWidth( bool bit) { return bit ? kPulseWidth1 : kPulseWidth0; }
 
     void init();
 
@@ -219,15 +220,15 @@ LED_PwmBuffer::writeLED( LED_Color color,
     //
     // We have to follow the order of GRB to sent data and the high bit sent at first.
     //
-    uint32_t color_pack = (color.blue << 0)
-                          | (color.red << 8)
-                          | (color.green << 16);
+    uint32_t color_pack = (color.blue << 0U)
+                          | (color.red << 8U)
+                          | (color.green << 16U);
 
     color_pack = color_pack & kProtectMask;
 
-    for ( uint32_t i = kBitsInColor; i != 0; i-- )
+    for ( uint32_t i = 0; i != kBitsInColor; i++ )
     {
-        data_[kResetCycles + led_index * kBitsInColor + i] = getPulseWidth( !!(color_pack & (1U << i)));
+        data_[kResetCycles + led_index * kBitsInColor + i] = getPulseWidth( color_pack & (1U << (kBitsInColor - i - 1U)));
     }
 }
 
@@ -240,19 +241,6 @@ static void
 DMA_Test()
 {
     gBuffer.init();
-    gBuffer.writeLED( LED_Color{128, 0, 0}, 0);
-    //gBuffer.writeLED( LED_Color{255, 0, 0}, 1);
-    //gBuffer.writeLED( LED_Color{255, 0, 0}, 2);
-    //gBuffer.writeLED( LED_Color{255, 0, 0}, 3);
-    //gBuffer.writeLED( LED_Color{255, 0, 0}, 4);
-    //gBuffer.writeLED( LED_Color{255, 0, 0}, 5);
-    //gBuffer.writeLED( LED_Color{255, 0, 0}, 6);
-    //gBuffer.writeLED( LED_Color{255, 0, 0}, 7);
-    //gBuffer.writeLED( LED_Color{255, 0, 0}, 8);
-    //gBuffer.writeLED( LED_Color{255, 0, 0}, 9);
-    //gBuffer.writeLED( LED_Color{255, 0, 0}, 10);
-    //gBuffer.writeLED( LED_Color{255, 0, 0}, 11);
-    //gBuffer.writeLED( LED_Color{255, 0, 0}, 12);
 
     /*
      * Setup timer to output compare mode
@@ -266,8 +254,7 @@ DMA_Test()
     LL_DMA_SetMemoryIncMode( DMA1, LL_DMA_CHANNEL_2, LL_DMA_MEMORY_INCREMENT);
     LL_DMA_SetMemorySize( DMA1, LL_DMA_CHANNEL_2, LL_DMA_MDATAALIGN_WORD);
 
-    //LL_DMA_SetMode( DMA1, LL_DMA_CHANNEL_2, LL_DMA_MODE_CIRCULAR);
-    LL_DMA_SetMode( DMA1, LL_DMA_CHANNEL_2, LL_DMA_MODE_NORMAL);
+    LL_DMA_SetMode( DMA1, LL_DMA_CHANNEL_2, LL_DMA_MODE_CIRCULAR);
     LL_DMA_SetDataLength( DMA1, LL_DMA_CHANNEL_2, gBuffer.length());
 
     LL_DMA_SetPeriphAddress( DMA1, LL_DMA_CHANNEL_2, (uint32_t)(&TIM2->CCR2));
@@ -294,12 +281,6 @@ DMA_Test()
     LL_DMA_EnableChannel( DMA1, LL_DMA_CHANNEL_2);
     LL_TIM_CC_EnableChannel( TIM2, LL_TIM_CHANNEL_CH2);
 
-//    NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
-//    NVIC_SetPriority(DMA1_Channel2_3_IRQn, 1);
-//
-//    NVIC_EnableIRQ(TIM2_IRQn);
-//    NVIC_SetPriority(TIM2_IRQn, 1);
-//
     LL_TIM_EnableCounter( TIM2);
 
     return;
@@ -337,6 +318,13 @@ void DMA1_Channel2_3_IRQHandler(void)
     //LL_TIM_ClearFlag_CC1(TIM2);
 }
 
+void delay()
+{
+        for ( uint32_t t = 0; t < 500000; t++ )
+        {
+        }
+}
+
 int main(void)
 {
     rcc_config();
@@ -349,11 +337,25 @@ int main(void)
     DMA_Test();
     //for ( int i = 0; i < 12312320; i++ )
     //{
-    //}
+   //}
 
     //LL_TIM_OC_SetCompareCH1(TIM2, 40);
+    uint8_t i = 0;
     for ( ;; )
     {
+        for ( i = 0; i < LED_Stripe::LedsCount; i++ )
+        {
+            gBuffer.writeLED( LED_Color{0, 10, 0}, i);
+            delay();
+        }
+
+        for ( i = LED_Stripe::LedsCount; i != 0; i-- )
+        {
+            gBuffer.writeLED( LED_Color{0, 0, 0}, i);
+            delay();
+        }
     }
     return 0;
 }
+
+
