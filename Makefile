@@ -19,7 +19,6 @@ LDFLAGS = \
 	-DSTM32F051x8 \
 	-Wall \
 	-Wextra \
-	-Werror \
 	-Wl,--start-group -lgcc -lc -lg -Wl,--end-group -Wl,--gc-sections \
 	-march=armv6-m \
 	-mcpu=cortex-m0 \
@@ -40,7 +39,7 @@ endif
 
 SOURCES = \
 	entry.S \
-	blinkled.c
+	blinkled.cc
 
 OBJECTS_HALFWAY_DONE = $(SOURCES:%.c=build/%.o)
 OBJECTS              = $(OBJECTS_HALFWAY_DONE:%.S=build/%.o)
@@ -64,6 +63,10 @@ build/%.o: %.c
 	@mkdir -p build
 	$(CC) $(CFLAGS) -o $@ -c $<
 
+build/%.o: %.cc
+	@mkdir -p build
+	$(CC) $(CFLAGS) -o $@ -c $<
+
 build/%.o: %.S
 	@mkdir -p build
 	$(CC) $(CFLAGS) -o $@ -c $<
@@ -77,6 +80,9 @@ clean:
 
 flash: $(BINARY_FLASH)
 	st-flash write $(BINARY_FLASH) 0x08000000
+
+reset: $(BINARY_FLASH)
+	st-flash --connect-under-reset --reset write $(BINARY_FLASH) 0x08000000
 
 GDB_FLAGS = \
 	--eval-command="set architecture arm" \

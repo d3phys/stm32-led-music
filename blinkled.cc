@@ -6,26 +6,6 @@
 #include "drivers/ll/stm32f0xx_ll_tim.h"
 #include "drivers/ll/stm32f0xx_ll_dma.h"
 
-//---------------
-// RCC Registers
-//---------------
-
-//#define REG_RCC_CR     (volatile uint32_t*)(uintptr_t)0x40021000U // Clock Control Register
-//#define REG_RCC_CFGR   (volatile uint32_t*)(uintptr_t)0x40021004U // PLL Configuration Register
-//#define REG_RCC_AHBENR (volatile uint32_t*)(uintptr_t)0x40021014U // AHB1 Peripheral Clock Enable Register
-//#define REG_RCC_CFGR2  (volatile uint32_t*)(uintptr_t)0x4002102CU // Clock configuration register 2
-//
-////----------------
-//// GPIO Registers
-////----------------
-//
-//#define GPIOC_MODER (volatile uint32_t*)(uintptr_t)0x48000800U // GPIO port mode register
-//#define GPIOC_TYPER (volatile uint32_t*)(uintptr_t)0x48000804U // GPIO port output type register
-
-//------
-// Main
-//------
-
 #define CPU_FREQENCY 48000000U // CPU frequency: 48 MHz
 #define ONE_MILLISECOND (CPU_FREQENCY/1000U)
 
@@ -147,19 +127,111 @@ static void timers_config(void)
     return;
 }
 
-static uint32_t gBuffer[] = {
-    100,
-    200,
-    300,
-    400,
-    500,
-    600,
-    700,
-    800,
-    900};
+struct LED_Stripe
+{
+    static const uint32_t LedsCount = 1;
+};
 
-const  uint16_t kBufferSize = sizeof( gBuffer) / sizeof(uint32_t);
+static const uint32_t AHB_Frequency_kHz = 48'000;
 
+struct LED_TransferTime
+{
+    //
+    // Datasheet edition
+    //
+    static const uint32_t Reset_ns  = 50'000;
+    static const uint32_t Period_ns =  1'250;
+    static const uint32_t T0H_ns    =    400;
+    static const uint32_t T1H_ns    =    800;
+    static const uint32_t T0L_ns    =    850;
+    static const uint32_t T1L_ns    =    450;
+    static const uint32_t Error_ns  =    150;
+
+    static const uint32_t Frequency_kHz = ( 1'000'000 / Period_ns );
+
+    static const uint32_t Period = ( AHB_Frequency_kHz / Frequency_kHz );
+    static const uint32_t T0H    = ( Period * T0H_ns ) / Period_ns;
+    static const uint32_t T0L    = ( Period * T0L_ns ) / Period_ns;
+    static const uint32_t T1H    = ( Period * T1H_ns ) / Period_ns;
+    static const uint32_t T1L    = ( Period * T1L_ns ) / Period_ns;
+
+    static const uint32_t Error = (Error_ns * Period) / Period_ns;
+    static_assert( Error > Period - (T1H + T1L), "Too big integer error..." );
+};
+
+struct LED_Color
+{
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
+};
+
+class LED_PwmBuffer
+{
+public:
+    static const uint32_t kResetCycles = LED_TransferTime::Reset_ns / LED_TransferTime::Period_ns + 4;
+    static const uint32_t kLedsCount = LED_Stripe::LedsCount;
+
+    static const uint32_t kPulseWidth0 = LED_TransferTime::T0H - 1;
+    static const uint32_t kPulseWidth1 = LED_TransferTime::T1H - 1;
+
+    static const uint32_t kBitsInColor = 24;
+    static const uint32_t kBufferLength = kResetCycles + kLedsCount * kBitsInColor;
+
+    static const uint32_t kProtectMask = 0xf0f0f0f0;
+
+
+    void writeLED( LED_Color color, uint32_t position);
+
+    uint32_t getPulseWidth( bool bit) { return bit ? kPulseWidth0 : kPulseWidth1; }
+
+    void init();
+
+    const uint32_t* data() { return data_; }
+    uint32_t length() { return kBufferLength; }
+
+private:
+    uint32_t data_[kBufferLength] = {0};
+};
+
+
+void
+LED_PwmBuffer::init()
+{
+    for ( uint32_t i = kResetCycles; i != kBufferLength; i++ )
+    {
+        data_[i] = kPulseWidth0;
+    }
+}
+
+void
+LED_PwmBuffer::writeLED( LED_Color color,
+                         uint32_t led_index)
+{
+    if ( led_index >= kLedsCount )
+    {
+        return;
+    }
+
+    //
+    // W2812b color is composition of 24bit data:
+    // G7 G6 G5 G4 G3 G2 G1 G0 R7 R6 R5 R4 R3 R2 R1 R0 B7 B6 B5 B4 B3 B2 B1 B0
+    //
+    // We have to follow the order of GRB to sent data and the high bit sent at first.
+    //
+    uint32_t color_pack = (color.blue << 0)
+                          | (color.red << 8)
+                          | (color.green << 16);
+
+    color_pack = color_pack & kProtectMask;
+
+    for ( uint32_t i = kBitsInColor; i != 0; i-- )
+    {
+        data_[kResetCycles + led_index * kBitsInColor + i] = getPulseWidth( !!(color_pack & (1U << i)));
+    }
+}
+
+static LED_PwmBuffer gBuffer;
 
 /*
  * Configure timer to output compare mode
@@ -167,6 +239,20 @@ const  uint16_t kBufferSize = sizeof( gBuffer) / sizeof(uint32_t);
 static void
 DMA_Test()
 {
+    gBuffer.init();
+    gBuffer.writeLED( LED_Color{128, 0, 0}, 0);
+    //gBuffer.writeLED( LED_Color{255, 0, 0}, 1);
+    //gBuffer.writeLED( LED_Color{255, 0, 0}, 2);
+    //gBuffer.writeLED( LED_Color{255, 0, 0}, 3);
+    //gBuffer.writeLED( LED_Color{255, 0, 0}, 4);
+    //gBuffer.writeLED( LED_Color{255, 0, 0}, 5);
+    //gBuffer.writeLED( LED_Color{255, 0, 0}, 6);
+    //gBuffer.writeLED( LED_Color{255, 0, 0}, 7);
+    //gBuffer.writeLED( LED_Color{255, 0, 0}, 8);
+    //gBuffer.writeLED( LED_Color{255, 0, 0}, 9);
+    //gBuffer.writeLED( LED_Color{255, 0, 0}, 10);
+    //gBuffer.writeLED( LED_Color{255, 0, 0}, 11);
+    //gBuffer.writeLED( LED_Color{255, 0, 0}, 12);
 
     /*
      * Setup timer to output compare mode
@@ -174,37 +260,19 @@ DMA_Test()
     LL_APB1_GRP1_EnableClock( LL_APB1_GRP1_PERIPH_TIM2);
     LL_AHB1_GRP1_EnableClock( LL_AHB1_GRP1_PERIPH_DMA1);
 
-    // The first one
-    //LL_DMA_DisableChannel( DMA1, LL_DMA_CHANNEL_3);
-
     LL_DMA_SetDataTransferDirection( DMA1, LL_DMA_CHANNEL_2, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);
 
-    //LL_DMA_SetMemoryAddress( DMA1, LL_DMA_CHANNEL_2, (uint32_t)(gBuffer));
-    LL_DMA_SetMemoryAddress( DMA1, LL_DMA_CHANNEL_2, (uint32_t)gBuffer);
+    LL_DMA_SetMemoryAddress( DMA1, LL_DMA_CHANNEL_2, (uint32_t)gBuffer.data());
     LL_DMA_SetMemoryIncMode( DMA1, LL_DMA_CHANNEL_2, LL_DMA_MEMORY_INCREMENT);
     LL_DMA_SetMemorySize( DMA1, LL_DMA_CHANNEL_2, LL_DMA_MDATAALIGN_WORD);
-    LL_DMA_SetMode( DMA1, LL_DMA_CHANNEL_2, LL_DMA_MODE_CIRCULAR);
+
+    //LL_DMA_SetMode( DMA1, LL_DMA_CHANNEL_2, LL_DMA_MODE_CIRCULAR);
+    LL_DMA_SetMode( DMA1, LL_DMA_CHANNEL_2, LL_DMA_MODE_NORMAL);
+    LL_DMA_SetDataLength( DMA1, LL_DMA_CHANNEL_2, gBuffer.length());
 
     LL_DMA_SetPeriphAddress( DMA1, LL_DMA_CHANNEL_2, (uint32_t)(&TIM2->CCR2));
     LL_DMA_SetPeriphIncMode( DMA1, LL_DMA_CHANNEL_2, LL_DMA_MEMORY_NOINCREMENT);
     LL_DMA_SetPeriphSize( DMA1, LL_DMA_CHANNEL_2, LL_DMA_PDATAALIGN_WORD);
-
-    LL_DMA_SetDataLength( DMA1, LL_DMA_CHANNEL_2, kBufferSize);
-
-    NVIC_EnableIRQ( DMA1_Channel2_3_IRQn);
-    NVIC_SetPriority( DMA1_Channel2_3_IRQn, 0);
-
-    //LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_TIM2);
-    LL_TIM_SetPrescaler( TIM2, 47999);
-    LL_TIM_SetAutoReload( TIM2, 999);
-    LL_TIM_SetCounterMode( TIM2, LL_TIM_COUNTERMODE_UP);
-    LL_TIM_EnableIT_UPDATE( TIM2);
-    LL_TIM_EnableDMAReq_UPDATE( TIM2);
-    LL_TIM_CC_SetDMAReqTrigger( TIM2, LL_TIM_CCDMAREQUEST_UPDATE);
-
-    LL_TIM_OC_SetCompareCH2( TIM2, 0);
-    LL_TIM_OC_SetPolarity( TIM2, LL_TIM_CHANNEL_CH2, LL_TIM_OCPOLARITY_HIGH);
-    LL_TIM_OC_SetMode( TIM2, LL_TIM_CHANNEL_CH2, LL_TIM_OCMODE_PWM1);
 
     LL_DMA_ClearFlag_TC2( DMA1);
     LL_DMA_ClearFlag_HT2( DMA1);
@@ -212,14 +280,26 @@ DMA_Test()
     LL_DMA_EnableIT_TC( DMA1, LL_DMA_CHANNEL_2);
     LL_DMA_EnableIT_HT( DMA1, LL_DMA_CHANNEL_2);
 
-    /*
-     * Setup NVIC
-     */
-    NVIC_EnableIRQ( TIM2_IRQn);
-    NVIC_SetPriority( TIM2_IRQn, 1);
+    LL_TIM_SetAutoReload( TIM2, LED_TransferTime::Period - 1);
+    LL_TIM_SetCounterMode( TIM2, LL_TIM_COUNTERMODE_UP);
+    LL_TIM_EnableIT_UPDATE( TIM2);
+    LL_TIM_EnableDMAReq_UPDATE( TIM2);
+    LL_TIM_CC_SetDMAReqTrigger( TIM2, LL_TIM_CCDMAREQUEST_UPDATE);
+
+    // Timer Channel 2
+    LL_TIM_OC_SetPolarity( TIM2, LL_TIM_CHANNEL_CH2, LL_TIM_OCPOLARITY_HIGH);
+    LL_TIM_OC_SetMode( TIM2, LL_TIM_CHANNEL_CH2, LL_TIM_OCMODE_PWM1);
+    LL_TIM_OC_SetCompareCH2( TIM2, 0);
 
     LL_DMA_EnableChannel( DMA1, LL_DMA_CHANNEL_2);
     LL_TIM_CC_EnableChannel( TIM2, LL_TIM_CHANNEL_CH2);
+
+//    NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
+//    NVIC_SetPriority(DMA1_Channel2_3_IRQn, 1);
+//
+//    NVIC_EnableIRQ(TIM2_IRQn);
+//    NVIC_SetPriority(TIM2_IRQn, 1);
+//
     LL_TIM_EnableCounter( TIM2);
 
     return;
@@ -234,7 +314,7 @@ void TIM2_IRQHandler(void)
 //        LL_TIM_OC_SetCompareCH2( TIM2, gBuffer[i]);
 //        i = (i + 1) % kBufferSize;
 //
-//        LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_8);
+        LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_8);
     }
 
     //LL_TIM_ClearFlag_CC1(TIM2);
@@ -245,13 +325,12 @@ void TIM2_IRQHandler(void)
 extern "C"
 void DMA1_Channel2_3_IRQHandler(void)
 {
-
     if ( LL_DMA_IsActiveFlag_TC2( DMA1) )
     {
         //LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_9);
     }
 
-    //LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_9);
+    LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_9);
     LL_DMA_ClearFlag_TE2( DMA1);
     LL_DMA_ClearFlag_TC2( DMA1);
     LL_DMA_ClearFlag_HT2( DMA1);
@@ -273,7 +352,7 @@ int main(void)
     //}
 
     //LL_TIM_OC_SetCompareCH1(TIM2, 40);
-    while (1)
+    for ( ;; )
     {
     }
     return 0;
