@@ -97,11 +97,14 @@ static void timers_config(void)
      * Configure output channel
      */
     LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOA);
-    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_5, LL_GPIO_MODE_ALTERNATE);
-    LL_GPIO_SetAFPin_0_7(GPIOA, LL_GPIO_PIN_5, LL_GPIO_AF_2);
+    //LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_5, LL_GPIO_MODE_ALTERNATE);
+    //LL_GPIO_SetAFPin_0_7(GPIOA, LL_GPIO_PIN_5, LL_GPIO_AF_2);
 
-    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_1, LL_GPIO_MODE_ALTERNATE);
-    LL_GPIO_SetAFPin_0_7(GPIOA, LL_GPIO_PIN_1, LL_GPIO_AF_2);
+    //LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_1, LL_GPIO_MODE_ALTERNATE);
+    //LL_GPIO_SetAFPin_0_7(GPIOA, LL_GPIO_PIN_1, LL_GPIO_AF_2);
+
+    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_2, LL_GPIO_MODE_ALTERNATE);
+    LL_GPIO_SetAFPin_0_7(GPIOA, LL_GPIO_PIN_2, LL_GPIO_AF_0);
 
 #if 0
     /*
@@ -129,7 +132,7 @@ static void timers_config(void)
 
 struct LED_Stripe
 {
-    static const uint32_t LedsCount = 30;
+    static const uint32_t LedsCount = 144;
 };
 
 static const uint32_t AHB_Frequency_kHz = 48'000;
@@ -184,15 +187,15 @@ public:
 
     void writeLED( LED_Color color, uint32_t position);
 
-    uint32_t getPulseWidth( bool bit) { return bit ? kPulseWidth1 : kPulseWidth0; }
+    uint16_t getPulseWidth( bool bit) { return bit ? kPulseWidth1 : kPulseWidth0; }
 
     void init();
 
-    const uint32_t* data() { return data_; }
+    const uint16_t* data() { return data_; }
     uint32_t length() { return kBufferLength; }
 
 private:
-    uint32_t data_[kBufferLength] = {0};
+    uint16_t data_[kBufferLength] = {0};
 };
 
 
@@ -244,67 +247,79 @@ DMA_Test()
 
     /*
      * Setup timer to output compare mode
+     * Request mapping reference manual page 194
+     *
+     * Table 29. Summary of the DMA requests for each channel
+     * on STM32F03x, STM32F04x and STM32F05x devices
      */
-    LL_APB1_GRP1_EnableClock( LL_APB1_GRP1_PERIPH_TIM2);
+    LL_APB1_GRP2_EnableClock( LL_APB1_GRP2_PERIPH_TIM15);
     LL_AHB1_GRP1_EnableClock( LL_AHB1_GRP1_PERIPH_DMA1);
 
-    LL_DMA_SetDataTransferDirection( DMA1, LL_DMA_CHANNEL_2, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);
+    LL_DMA_SetDataTransferDirection( DMA1, LL_DMA_CHANNEL_5, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);
 
-    LL_DMA_SetMemoryAddress( DMA1, LL_DMA_CHANNEL_2, (uint32_t)gBuffer.data());
-    LL_DMA_SetMemoryIncMode( DMA1, LL_DMA_CHANNEL_2, LL_DMA_MEMORY_INCREMENT);
-    LL_DMA_SetMemorySize( DMA1, LL_DMA_CHANNEL_2, LL_DMA_MDATAALIGN_WORD);
+    LL_DMA_SetMemoryAddress( DMA1, LL_DMA_CHANNEL_5, (uint32_t)gBuffer.data());
+    LL_DMA_SetMemoryIncMode( DMA1, LL_DMA_CHANNEL_5, LL_DMA_MEMORY_INCREMENT);
+    LL_DMA_SetMemorySize( DMA1, LL_DMA_CHANNEL_5, LL_DMA_MDATAALIGN_HALFWORD);
 
-    LL_DMA_SetMode( DMA1, LL_DMA_CHANNEL_2, LL_DMA_MODE_CIRCULAR);
-    LL_DMA_SetDataLength( DMA1, LL_DMA_CHANNEL_2, gBuffer.length());
+    LL_DMA_SetMode( DMA1, LL_DMA_CHANNEL_5, LL_DMA_MODE_CIRCULAR);
+    LL_DMA_SetDataLength( DMA1, LL_DMA_CHANNEL_5, gBuffer.length());
 
-    LL_DMA_SetPeriphAddress( DMA1, LL_DMA_CHANNEL_2, (uint32_t)(&TIM2->CCR2));
-    LL_DMA_SetPeriphIncMode( DMA1, LL_DMA_CHANNEL_2, LL_DMA_MEMORY_NOINCREMENT);
-    LL_DMA_SetPeriphSize( DMA1, LL_DMA_CHANNEL_2, LL_DMA_PDATAALIGN_WORD);
+    LL_DMA_SetPeriphAddress( DMA1, LL_DMA_CHANNEL_5, (uint32_t)(&TIM15->CCR1));
+    LL_DMA_SetPeriphIncMode( DMA1, LL_DMA_CHANNEL_5, LL_DMA_MEMORY_NOINCREMENT);
+    LL_DMA_SetPeriphSize( DMA1, LL_DMA_CHANNEL_5, LL_DMA_PDATAALIGN_HALFWORD);
 
     LL_DMA_ClearFlag_TC2( DMA1);
     LL_DMA_ClearFlag_HT2( DMA1);
 
-    LL_DMA_EnableIT_TC( DMA1, LL_DMA_CHANNEL_2);
-    LL_DMA_EnableIT_HT( DMA1, LL_DMA_CHANNEL_2);
+    LL_DMA_EnableIT_TC( DMA1, LL_DMA_CHANNEL_5);
+    LL_DMA_EnableIT_HT( DMA1, LL_DMA_CHANNEL_5);
 
-    LL_TIM_SetAutoReload( TIM2, LED_TransferTime::Period - 1);
-    LL_TIM_SetCounterMode( TIM2, LL_TIM_COUNTERMODE_UP);
-    LL_TIM_EnableIT_UPDATE( TIM2);
-    LL_TIM_EnableDMAReq_UPDATE( TIM2);
-    LL_TIM_CC_SetDMAReqTrigger( TIM2, LL_TIM_CCDMAREQUEST_UPDATE);
+    LL_TIM_DisableCounter( TIM15);
+    // to delete
+    LL_TIM_SetAutoReload( TIM15, LED_TransferTime::Period - 1);
+    LL_TIM_SetCounterMode( TIM15, LL_TIM_COUNTERMODE_UP);
+    LL_TIM_EnableIT_UPDATE( TIM15);
+    LL_TIM_EnableDMAReq_UPDATE( TIM15);
+    LL_TIM_CC_SetDMAReqTrigger( TIM15, LL_TIM_CCDMAREQUEST_UPDATE);
 
-    // Timer Channel 2
-    LL_TIM_OC_SetPolarity( TIM2, LL_TIM_CHANNEL_CH2, LL_TIM_OCPOLARITY_HIGH);
-    LL_TIM_OC_SetMode( TIM2, LL_TIM_CHANNEL_CH2, LL_TIM_OCMODE_PWM1);
-    LL_TIM_OC_SetCompareCH2( TIM2, 0);
+    // Timer Channel 1
+    LL_TIM_OC_SetPolarity( TIM15, LL_TIM_CHANNEL_CH1, LL_TIM_OCPOLARITY_HIGH);
+    LL_TIM_OC_SetMode( TIM15, LL_TIM_CHANNEL_CH1, LL_TIM_OCMODE_PWM1);
+    LL_TIM_OC_SetCompareCH1( TIM15, 0);
 
-    LL_DMA_EnableChannel( DMA1, LL_DMA_CHANNEL_2);
-    LL_TIM_CC_EnableChannel( TIM2, LL_TIM_CHANNEL_CH2);
+    LL_DMA_EnableChannel( DMA1, LL_DMA_CHANNEL_5);
+    LL_TIM_EnableAllOutputs( TIM15);
+    LL_TIM_CC_EnableChannel( TIM15, LL_TIM_CHANNEL_CH1);
 
-    LL_TIM_EnableCounter( TIM2);
+    //NVIC_EnableIRQ(TIM15_IRQn);
+    //NVIC_SetPriority(TIM15_IRQn, 1);
 
+    //NVIC_EnableIRQ(DMA1_Channel4_5_IRQn);
+    //NVIC_SetPriority(DMA1_Channel4_5_IRQn, 0);
+
+    LL_TIM_EnableCounter( TIM15);
     return;
 }
 
 extern "C"
-void TIM2_IRQHandler(void)
+void TIM15_IRQHandler(void)
 {
     //static int i = 0;
-    if ( LL_TIM_IsActiveFlag_UPDATE( TIM2) )
+    if ( LL_TIM_IsActiveFlag_UPDATE( TIM15) )
     {
-//        LL_TIM_OC_SetCompareCH2( TIM2, gBuffer[i]);
+//        LL_TIM_OC_SetCompareCH2( TIM15, gBuffer[i]);
 //        i = (i + 1) % kBufferSize;
 //
         LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_8);
     }
 
-    //LL_TIM_ClearFlag_CC1(TIM2);
+    //LL_TIM_ClearFlag_CC1(TIM15);
     //LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_8);
-    LL_TIM_ClearFlag_UPDATE( TIM2);
+    LL_TIM_ClearFlag_UPDATE( TIM15);
 }
 
 extern "C"
-void DMA1_Channel2_3_IRQHandler(void)
+void DMA1_Channel4_5_IRQHandler(void)
 {
     if ( LL_DMA_IsActiveFlag_TC2( DMA1) )
     {
@@ -315,7 +330,6 @@ void DMA1_Channel2_3_IRQHandler(void)
     LL_DMA_ClearFlag_TE2( DMA1);
     LL_DMA_ClearFlag_TC2( DMA1);
     LL_DMA_ClearFlag_HT2( DMA1);
-    //LL_TIM_ClearFlag_CC1(TIM2);
 }
 
 void delay()
@@ -325,7 +339,7 @@ void delay()
         }
 }
 
-int main(void)
+int main()
 {
     rcc_config();
     gpio_config();
@@ -358,4 +372,117 @@ int main(void)
     return 0;
 }
 
+/*
+ * This example demonstrates using timers to generate PWM
+ * signal
+ */
 
+#if 0
+/**
+  * System Clock Configuration
+  * The system Clock is configured as follow :
+  *    System Clock source            = PLL (HSI/2)
+  *    SYSCLK(Hz)                     = 48000000
+  *    HCLK(Hz)                       = 48000000
+  *    AHB Prescaler                  = 1
+  *    APB1 Prescaler                 = 1
+  *    HSI Frequency(Hz)              = 8000000
+  *    PLLMUL                         = 12
+  *    Flash Latency(WS)              = 1
+  */
+static void rcc_config()
+{
+    /* Set FLASH latency */
+    //LL_FLASH_SetLatency(LL_FLASH_LATENCY_1);
+
+    /* Enable HSI and wait for activation*/
+    LL_RCC_HSI_Enable();
+    while (LL_RCC_HSI_IsReady() != 1);
+
+    /* Main PLL configuration and activation */
+    LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSI_DIV_2,
+                                LL_RCC_PLL_MUL_12);
+
+    LL_RCC_PLL_Enable();
+    while (LL_RCC_PLL_IsReady() != 1);
+
+    /* Sysclk activation on the main PLL */
+    LL_RCC_SetAHBPrescaler(LL_RCC_SYSCLK_DIV_1);
+    LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_PLL);
+    while (LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_STATUS_PLL);
+
+    /* Set APB1 prescaler */
+    LL_RCC_SetAPB1Prescaler(LL_RCC_APB1_DIV_1);
+
+    /* Update CMSIS variable (which can be updated also
+     * through SystemCoreClockUpdate function) */
+    //SystemCoreClock = 48000000;
+}
+
+/*
+ * Clock on GPIOC and set one led
+ */
+static void gpio_config(void)
+{
+    LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOC);
+    LL_GPIO_SetPinMode(GPIOC, LL_GPIO_PIN_8, LL_GPIO_MODE_OUTPUT);
+    return;
+}
+
+/*
+ * Configure timer to output compare mode
+ */
+static void timers_config(void)
+{
+    /*
+     * Configure output channel
+     */
+    LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOA);
+    LL_GPIO_SetPinMode(GPIOA, LL_GPIO_PIN_2, LL_GPIO_MODE_ALTERNATE);
+    LL_GPIO_SetAFPin_0_7(GPIOA, LL_GPIO_PIN_2, LL_GPIO_AF_0);
+    /*
+     * Setup timer to output compare mode
+     */
+    LL_APB1_GRP2_EnableClock(LL_APB1_GRP2_PERIPH_TIM15);
+    LL_TIM_SetPrescaler(TIM15, 479);
+    LL_TIM_SetAutoReload(TIM15, 999);
+    LL_TIM_SetCounterMode(TIM15, LL_TIM_COUNTERMODE_UP);
+    LL_TIM_EnableIT_CC1(TIM15);
+    LL_TIM_OC_SetCompareCH1(TIM15, 300);
+    LL_TIM_EnableAllOutputs( TIM15);
+    /*
+     * Setup NVIC
+     */
+    NVIC_EnableIRQ(TIM15_IRQn);
+    NVIC_SetPriority(TIM15_IRQn, 1);
+    LL_TIM_OC_SetPolarity(TIM15, LL_TIM_CHANNEL_CH1, LL_TIM_OCPOLARITY_HIGH);
+    LL_TIM_OC_SetMode(TIM15, LL_TIM_CHANNEL_CH1, LL_TIM_OCMODE_PWM1);
+    LL_TIM_CC_EnableChannel(TIM15, LL_TIM_CHANNEL_CH1);
+    LL_TIM_EnableCounter(TIM15);
+    return;
+}
+
+extern "C"
+void TIM15_IRQHandler(void)
+{
+    //LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_8);
+    //
+    if ( LL_TIM_IsActiveFlag_CC1(TIM15) )
+    {
+        LL_GPIO_TogglePin(GPIOC, LL_GPIO_PIN_8);
+    }
+    LL_TIM_ClearFlag_CC1(TIM15);
+    LL_TIM_ClearFlag_UPDATE( TIM15);
+}
+
+int main(void)
+{
+    rcc_config();
+    gpio_config();
+    timers_config();
+
+    while (1);
+    return 0;
+}
+
+#endif
