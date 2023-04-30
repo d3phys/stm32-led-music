@@ -59,6 +59,7 @@ public:
     constexpr static const uint32_t kBufferLength = kResetCycles + kLedsCount * kBitsInColor;
 
     constexpr static const uint32_t kProtectMask = 0x0f0f0f;
+    constexpr static const uint32_t kMaxColorValue = 16;
 
     void writeLED( LED_Color color, uint32_t position);
 

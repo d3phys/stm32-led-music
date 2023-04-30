@@ -30,12 +30,9 @@ LED_PwmBuffer::writeLED( LED_Color color,    // color
         return;
     }
 
-    if ( color.blue >= 8 )
-        color.blue = 8;
-    if ( color.red >= 8)
-        color.red = 8;
-    if ( color.green >= 8)
-        color.green = 8;
+    if ( color.blue  >= kMaxColorValue ) color.blue  = kMaxColorValue;
+    if ( color.red   >= kMaxColorValue)  color.red   = kMaxColorValue;
+    if ( color.green >= kMaxColorValue)  color.green = kMaxColorValue;
 
     //
     // W2812b color is composition of 24bit data:

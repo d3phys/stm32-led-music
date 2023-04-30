@@ -67,27 +67,42 @@ void DMA1_Channel1_IRQHandler( void)
         max_level = 1;
     }
 
-    int32_t new_blink = ( LED_Stripe::LedsCount * mean ) / max_level;
-    if ( new_blink >= (int32_t)LED_Stripe::LedsCount )
+    const int32_t kLength = LED_Stripe::LedsCount / 2;
+    const int32_t kSegment = kLength / 3;
+    const int32_t kScale = kLength / LED_PwmBuffer::kMaxColorValue;
+
+    int32_t new_blink = ( 2 * kLength * mean ) / max_level;
+    if ( new_blink >= (int32_t)kLength )
     {
-        new_blink = LED_Stripe::LedsCount;
+        new_blink = kLength;
     }
 
     //
     // Running average filter
     //
     static int32_t n_blink = 0;
-    n_blink += ( new_blink - n_blink ) >> 4;
-    max_level += ( n_blink - max_level ) >> 8;
+    n_blink += ( new_blink - n_blink ) >> 3;
+    max_level += ( mean - max_level ) >> 1;
 
-    for ( int32_t i = n_blink; i != LED_Stripe::LedsCount; ++i )
+    for ( int32_t i = n_blink; i < (int32_t)(LED_Stripe::LedsCount / 2); ++i )
     {
-        gPwmBuffer.writeLED( LED_Color{0, 0, 0}, i);
+        gPwmBuffer.writeLED( LED_Color{0, 0, 0}, LED_Stripe::LedsCount/2 + i);
+        gPwmBuffer.writeLED( LED_Color{0, 0, 0}, LED_Stripe::LedsCount/2 - i);
     }
 
     for ( int32_t i = 0; i != n_blink; ++i )
     {
-        gPwmBuffer.writeLED( { 5, 0, 5}, i);
+        LED_Color color;
+        color.red = i < kSegment ? (kSegment - i) : i < 2 * kSegment ? (               0) : (i -  2 * kSegment);
+        color.green = i < kSegment ? (           i) : i < 2 * kSegment ? (2 * kSegment - i) : (                0);
+        color.blue = i < kSegment ? (           0) : i < 2 * kSegment ? (i -     kSegment) : (3 * kSegment -  i);
+
+        color.red = (color.red / kScale);
+        color.green = (color.green / kScale);
+        color.blue = (color.blue / kScale);
+
+        gPwmBuffer.writeLED( color, LED_Stripe::LedsCount/2 + i);
+        gPwmBuffer.writeLED( color, LED_Stripe::LedsCount/2 - i);
     }
 
     LL_DMA_ClearFlag_TC1( DMA1);
