@@ -12,7 +12,8 @@ CFLAGS = \
 	-Wall \
 	-Wextra \
 	-march=armv6-m \
-	-mcpu=cortex-m0
+	-mcpu=cortex-m0 \
+	-fno-exceptions
 
 LDFLAGS = \
 	-Idrivers\
@@ -37,21 +38,18 @@ endif
 # Files
 #-------
 
-SOURCES = \
-	entry.S \
-	blinkled.cc
+OBJECTS = \
+	entry.o \
+	blinkled.o \
+	led/ws2812b.o \
+	asp/adc.o
 
-OBJECTS_HALFWAY_DONE = $(SOURCES:%.c=build/%.o)
-OBJECTS              = $(OBJECTS_HALFWAY_DONE:%.S=build/%.o)
-
-EXECUTABLE_FLASH = build/reaction.elf
-BINARY_FLASH     = build/reaction.bin
-
-#---------------
-# Build scripts
-#---------------
+EXECUTABLE_FLASH = firmware.elf
+BINARY_FLASH     = firmware.bin
 
 all: $(EXECUTABLE_FLASH) $(BINARY_FLASH) $(SOURCES)
+
+$(OBJECTS): Makefile
 
 $(EXECUTABLE_FLASH): $(OBJECTS)
 	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
@@ -59,24 +57,11 @@ $(EXECUTABLE_FLASH): $(OBJECTS)
 $(BINARY_FLASH): $(EXECUTABLE_FLASH)
 	arm-none-eabi-objcopy -O binary $< $@
 
-build/%.o: %.c
-	@mkdir -p build
-	$(CC) $(CFLAGS) -o $@ -c $<
-
-build/%.o: %.cc
-	@mkdir -p build
-	$(CC) $(CFLAGS) -o $@ -c $<
-
-build/%.o: %.S
-	@mkdir -p build
-	$(CC) $(CFLAGS) -o $@ -c $<
-
 clean:
-	rm -rf build
+	rm $(EXECUTABLE_FLASH) $(BINARY_FLASH)
+	find . -name "*.o" -type f -delete
 
-#----------------------
-# Hardware interaction
-#----------------------
+# ---- Hardware interaction ----
 
 flash: $(BINARY_FLASH)
 	st-flash write $(BINARY_FLASH) 0x08000000
@@ -97,3 +82,15 @@ gdb: $(BINARY_FLASH)
 	arm-none-eabi-gdb $(GDB_FLAGS)
 
 .PHONY: all clean flash hardware gdb
+
+# ---- Dependencies ----
+
+led/ws2812b.o: led/ws2812b.h
+blinkled.o: led/ws2812b.h asp/adc.h
+asp/adc.o: asp/adc.h
+
+%.o: %.cc
+	$(CC) $(CFLAGS) -o $@ -c $<
+
+%.o: %.S
+	$(CC) $(CFLAGS) -o $@ -c $<
