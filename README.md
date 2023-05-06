@@ -12,7 +12,7 @@ Led music on stm32f051 and led strip ws2812b.
 Make sure to use the correct GPIO pins for your specific microcontroller.
 The following pin map for is used for stm32f051 discovery:
 
-- PA2 - ws2812b stripe input channel
+- PA2 - ws2812b stripe input channel.
 - PA4 and PA5 - controller ADC input: minijack left and right channels.
 
 ![alt text](images/connection.png "Connection")
@@ -55,4 +55,12 @@ Using the DMA allows system to work asynchronously, which removes bugs with losi
 
 - Denis Dedkov ([d3phys](https://github.com/d3phys))
 - Alexander Simankovich ([futherus](https://github.com/futherus))
+
+## Acknowledgments
+
+Without these resources, this project might not exist:
+
+- MIPT stm32 course: https://github.com/VladikNeVladik/stm32f051_rewind
+- Narod stream ws2812b guide: https://narodstream.ru/
+- Alex Gyver ws2812b guide: https://alexgyver.ru/
 
