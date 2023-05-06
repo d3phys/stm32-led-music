@@ -1,8 +1,7 @@
-# Led Music
+# Led Music :notes:
 
 Led music on stm32f051 and led strip ws2812b.
-
-[[PHOTOS HERE]]
+![alt text](images/light-stripe.png "Light Music")
 
 ## Prerequisites & Connection
 
@@ -10,7 +9,13 @@ Led music on stm32f051 and led strip ws2812b.
 - led strip ws2812b, 144 leds
 - mini-jack connector
 
-[[DESCRIBE CONNECTION HERE]]
+Make sure to use the correct GPIO pins for your specific microcontroller.
+The following pin map for is used for stm32f051 discovery:
+
+- PA2 - ws2812b stripe input channel
+- PA4 and PA5 - controller ADC input: minijack left and right channels.
+
+![alt text](images/connection.png "Connection")
 
 ## Build
 
@@ -48,7 +53,6 @@ PWM buffer is a set of 24-bit packs, which encode led colors.
 Using the DMA allows system to work asynchronously, which removes bugs with losing input signal and led strip flickering. However, amount of SRAM (8kib) disallows using large led strips, because of PWM buffer size.
 ## Authors
 
-- Denis Dedkov
-- Alexander Simankovich
+- Denis Dedkov ([d3phys](https://github.com/d3phys))
+- Alexander Simankovich ([futherus](https://github.com/futherus))
 
-[[ LINKS HERE ]]
