@@ -23,7 +23,7 @@ void
 ASP_StartProcessing( ASP_AdcBuffer* buffer)
 {
     //
-    // Set up GPIO PA4, PA5, PA6 pins as Analog input (see ADC additional function)
+    // Set up GPIO PA4, PA5 pins as Analog input (see ADC additional function)
     // Docs: docs/stm32f051_family.pdf
     //
     LL_AHB1_GRP1_EnableClock( LL_AHB1_GRP1_PERIPH_GPIOA);

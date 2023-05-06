@@ -93,9 +93,9 @@ void DMA1_Channel1_IRQHandler( void)
     for ( int32_t i = 0; i != n_blink; ++i )
     {
         LED_Color color;
-        color.red = i < kSegment ? (kSegment - i) : i < 2 * kSegment ? (               0) : (i -  2 * kSegment);
+        color.red   = i < kSegment ? (kSegment - i) : i < 2 * kSegment ? (               0) : (i -  2 * kSegment);
         color.green = i < kSegment ? (           i) : i < 2 * kSegment ? (2 * kSegment - i) : (                0);
-        color.blue = i < kSegment ? (           0) : i < 2 * kSegment ? (i -     kSegment) : (3 * kSegment -  i);
+        color.blue  = i < kSegment ? (           0) : i < 2 * kSegment ? (i -     kSegment) : (3 * kSegment -  i);
 
         color.red = (color.red / kScale);
         color.green = (color.green / kScale);

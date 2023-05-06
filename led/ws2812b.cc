@@ -60,7 +60,7 @@ void
 LED_StartTransfer( LED_PwmBuffer* buffer) // PWM buffer
 {
     //
-    // Set up GPIO PA1 pin as PWM output.
+    // Set up GPIO PA2 pin as PWM output.
     // Table 14. Alternate functions selected through GPIOA_AFR registers for port A
     // Docs: docs/stm32f051_family.pdf
     //
