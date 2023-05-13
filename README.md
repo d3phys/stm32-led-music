@@ -51,6 +51,11 @@ PWM buffer is a set of 24-bit packs, which encode led colors.
 3. Led strip driver recieves PWM buffer and configures 16-bit timer and DMA to send PWM signal to led strip.
 
 Using the DMA allows system to work asynchronously, which removes bugs with losing input signal and led strip flickering. However, amount of SRAM (8kib) disallows using large led strips, because of PWM buffer size.
+
+<p align="center">
+<img src="images/scheme.png" alt= “Scheme” height="600">
+</p>
+
 ## Authors
 
 - Denis Dedkov ([d3phys](https://github.com/d3phys))
